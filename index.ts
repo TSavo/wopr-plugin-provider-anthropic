@@ -10,9 +10,72 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
-import type { ModelProvider, ModelClient, ModelQueryOptions } from "wopr/dist/types/provider.js";
-import type { WOPRPlugin, WOPRPluginContext } from "wopr/dist/types.js";
 import winston from "winston";
+
+// =============================================================================
+// Type definitions (inline to avoid wopr dependency for builds)
+// =============================================================================
+
+interface ModelQueryOptions {
+  prompt: string;
+  systemPrompt?: string;
+  resume?: string;
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  topP?: number;
+  images?: string[];
+  mcpServers?: Record<string, unknown>;
+  providerOptions?: Record<string, unknown>;
+}
+
+interface ModelClient {
+  query(options: ModelQueryOptions): AsyncGenerator<unknown>;
+  listModels(): Promise<string[]>;
+  healthCheck(): Promise<boolean>;
+}
+
+interface ModelProvider {
+  id: string;
+  name: string;
+  description: string;
+  defaultModel: string;
+  supportedModels: string[];
+  validateCredentials(credentials: string): Promise<boolean>;
+  createClient(credential: string, options?: Record<string, unknown>): Promise<ModelClient>;
+  getCredentialType(): "api-key" | "oauth" | "custom";
+}
+
+interface ConfigField {
+  name: string;
+  type: string;
+  label: string;
+  placeholder?: string;
+  required?: boolean;
+  description?: string;
+  options?: Array<{ value: string; label: string }>;
+  default?: unknown;
+}
+
+interface ConfigSchema {
+  title: string;
+  description: string;
+  fields: ConfigField[];
+}
+
+interface WOPRPluginContext {
+  log: { info: (msg: string) => void; warn: (msg: string) => void };
+  registerProvider: (provider: ModelProvider) => void;
+  registerConfigSchema: (name: string, schema: ConfigSchema) => void;
+}
+
+interface WOPRPlugin {
+  name: string;
+  version: string;
+  description: string;
+  init(ctx: WOPRPluginContext): Promise<void>;
+  shutdown(): Promise<void>;
+}
 
 const logger = winston.createLogger({
   level: "info",
